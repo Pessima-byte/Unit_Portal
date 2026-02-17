@@ -2,20 +2,14 @@
 
 import { useState, useTransition } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CourseLevel } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createCourse, updateCourse, deleteCourse } from "@/modules/admin/actions/courseActions"
 import { Plus, Edit, Trash2, X } from "lucide-react"
 
-// Hardcoding enum values to avoid import issues in client component if types aren't fully sync'd
-enum CourseLevel {
-  UNDERGRADUATE = "UNDERGRADUATE",
-  POSTGRADUATE = "POSTGRADUATE",
-  DIPLOMA = "DIPLOMA",
-  CERTIFICATE = "CERTIFICATE",
-  PHD = "PHD"
-}
+
 
 interface Department {
   id: string
