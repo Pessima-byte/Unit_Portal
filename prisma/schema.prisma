@@ -1,0 +1,377 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  LECTURER
+  ADMIN
+  FINANCE
+  APPLICANT
+}
+
+enum GradeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          UserRole
+  studentId     String?   @unique
+  phone         String?
+  address       String?
+  dateOfBirth   DateTime?
+  profileImage  String?
+  isActive      Boolean   @default(true)
+  salary        Float     @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  department    Department? @relation(fields: [departmentId], references: [id])
+  departmentId  String?
+
+  // Student relations
+  enrollments   CourseEnrollment[]
+  grades        Grade[]
+  payments      Payment[]
+  attendance    Attendance[]
+  
+  // Applicant relations
+  appliedCourse   Course? @relation("AppliedCourse", fields: [appliedCourseId], references: [id])
+  appliedCourseId String?
+
+  // Lecturer relations
+  courses       Course[]  @relation("CourseLecturer")
+  assignments   Assignment[]
+  gradedBy      Grade[]   @relation("GradeGradedBy")
+
+  // Admin relations
+  announcementsCreated Announcement[] @relation("AnnouncementCreatedBy")
+  resultsApproved      Grade[]        @relation("GradeApprovedBy")
+
+  // Application
+  application Application?
+
+  @@index([email])
+  @@index([role])
+  @@index([studentId])
+}
+
+model Application {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Personal Details
+  dateOfBirth DateTime
+  gender      String
+  nationality String
+  religion    String?
+  placeOfBirth String?
+  address     String
+
+  // Guardian Details
+  guardianName         String
+  guardianRelationship String
+  guardianPhone        String
+  guardianEmail        String?
+  guardianAddress      String?
+
+  // Education History
+  previousSchool       String
+  graduationYear       Int
+  grades               String? // JSON or text description of grades
+
+  // Program Selection
+  courseId    String
+  course      Course @relation(fields: [courseId], references: [id])
+  
+  // Documents (URLs)
+  passportPhotoUrl   String?
+  transcriptUrl      String?
+  idCardUrl          String?
+  
+  status      ApplicationStatus @default(PENDING)
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWING
+  ACCEPTED
+  REJECTED
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Manual Stats (as requested for forms)
+  studentCount   Int      @default(0)
+  lecturerCount  Int      @default(0)
+  staffCount     Int      @default(0)
+  courseCount    Int      @default(0)
+  totalSalary    Float    @default(0)
+  
+  // Relations
+  users       User[]
+  courses     Course[]
+  feeStructures FeeStructure[]
+
+  @@index([code])
+}
+
+enum CourseLevel {
+  UNDERGRADUATE
+  POSTGRADUATE
+  DIPLOMA
+  CERTIFICATE
+  PHD
+}
+
+model Course {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  name            String
+  description     String?
+  creditUnits     Int      @default(3)
+  level           Int      // e.g., 100, 200, 300, 400
+  type            CourseLevel @default(UNDERGRADUATE)
+  requirements    String[]
+  semester        String   // e.g., "Fall", "Spring", "Summer"
+  academicYear    String
+  maxStudents     Int?
+  currentStudents Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  department      Department @relation(fields: [departmentId], references: [id])
+  departmentId    String
+
+  lecturer        User?     @relation("CourseLecturer", fields: [lecturerId], references: [id])
+  lecturerId      String?
+
+  applicants      User[]    @relation("AppliedCourse")
+  
+  prerequisites   CoursePrerequisite[] @relation("PrerequisiteCourse")
+  requiredFor     CoursePrerequisite[] @relation("RequiredCourse")
+
+  enrollments     CourseEnrollment[]
+  assignments     Assignment[]
+  grades          Grade[]
+  applications    Application[]
+
+  @@index([code])
+  @@index([departmentId])
+  @@index([lecturerId])
+}
+
+model CoursePrerequisite {
+  id                String   @id @default(cuid())
+  prerequisiteId    String
+  requiredCourseId  String
+
+  prerequisite      Course   @relation("PrerequisiteCourse", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+  requiredCourse    Course   @relation("RequiredCourse", fields: [requiredCourseId], references: [id], onDelete: Cascade)
+
+  @@unique([prerequisiteId, requiredCourseId])
+  @@index([prerequisiteId])
+  @@index([requiredCourseId])
+}
+
+model CourseEnrollment {
+  id          String   @id @default(cuid())
+  studentId   String
+  courseId    String
+  enrolledAt  DateTime @default(now())
+  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, DROPPED, FAILED
+
+  student     User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@index([courseId])
+}
+
+model Assignment {
+  id          String    @id @default(cuid())
+  courseId    String
+  lecturerId String
+  title       String
+  description String?
+  dueDate     DateTime
+  maxScore    Float
+  fileUrl     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lecturer    User      @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+  submissions Grade[]
+
+  @@index([courseId])
+  @@index([lecturerId])
+}
+
+model Grade {
+  id            String      @id @default(cuid())
+  studentId     String
+  assignmentId  String?
+  courseId      String
+  score         Float
+  maxScore      Float
+  percentage    Float
+  letterGrade   String?     // A, B, C, D, F
+  status        GradeStatus @default(PENDING)
+  remarks       String?
+  gradedAt      DateTime?
+  approvedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  student       User        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignment    Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  course        Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  gradedBy      User?       @relation("GradeGradedBy", fields: [gradedById], references: [id])
+  gradedById    String?
+  approvedBy    User?       @relation("GradeApprovedBy", fields: [approvedById], references: [id])
+  approvedById  String?
+
+  @@index([studentId])
+  @@index([courseId])
+  @@index([assignmentId])
+  @@index([status])
+}
+
+model Attendance {
+  id          String   @id @default(cuid())
+  studentId  String
+  courseId   String
+  date       DateTime
+  status     String   // PRESENT, ABSENT, LATE, EXCUSED
+  remarks    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  student    User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([courseId])
+  @@index([date])
+}
+
+model FeeStructure {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  amount        Float
+  academicYear  String
+  semester      String?
+  level         Int?     // If null, applies to all levels
+  departmentId  String?  // If null, applies to all departments
+  dueDate       DateTime?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  department    Department? @relation(fields: [departmentId], references: [id])
+  payments      Payment[]
+
+  @@index([academicYear])
+  @@index([departmentId])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  studentId       String
+  feeStructureId  String
+  amount          Float
+  status          PaymentStatus @default(PENDING)
+  paymentMethod   String?       // CASH, CARD, BANK_TRANSFER, ONLINE
+  transactionId   String?       @unique
+  receiptUrl      String?
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  student         User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeStructure    FeeStructure  @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([feeStructureId])
+  @@index([status])
+  @@index([transactionId])
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  type        String   // GENERAL, ACADEMIC, FINANCIAL, URGENT
+  targetRole  UserRole? // If null, visible to all roles
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy   User     @relation("AnnouncementCreatedBy", fields: [createdById], references: [id])
+  createdById String
+
+  notifications Notification[]
+
+  @@index([type])
+  @@index([targetRole])
+  @@index([isPublished])
+}
+
+model Notification {
+  id            String       @id @default(cuid())
+  userId        String
+  announcementId String?
+  title         String
+  message       String
+  type          String       // EMAIL, SMS, IN_APP
+  status        String       @default("PENDING") // PENDING, SENT, FAILED
+  read          Boolean      @default(false)
+  readAt        DateTime?
+  sentAt        DateTime?
+  createdAt     DateTime     @default(now())
+
+  announcement  Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([read])
+}
+
