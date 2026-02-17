@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,10 +14,14 @@ import { submitStudentApplication, getRegistrationCourses } from "../actions/aut
 
 export function RegisterForm() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const queryCollegeId = searchParams.get("collegeId")
     const [step, setStep] = useState(1)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [courses, setCourses] = useState<{ id: string; name: string; code: string }[]>([])
+    const [colleges, setColleges] = useState<{ id: string; name: string }[]>([])
+    const [fetchingCourses, setFetchingCourses] = useState(false)
 
     // Form Data State
     const [formData, setFormData] = useState({
@@ -48,17 +52,42 @@ export function RegisterForm() {
         previousSchool: "",
         graduationYear: "",
         grades: "", // Description of grades
+        collegeId: "",
         courseId: "",
     })
 
     useEffect(() => {
-        // Fetch courses for dropdown
-        getRegistrationCourses().then((res) => {
-            if (res.success && res.courses) {
-                setCourses(res.courses as { id: string; name: string; code: string }[])
-            }
+        // Fetch colleges for dropdown
+        import("../actions/authActions").then(({ getColleges }) => {
+            getColleges().then((res) => {
+                if (res.success && res.colleges) {
+                    setColleges(res.colleges)
+
+                    // If collegeId in query, set it
+                    if (queryCollegeId) {
+                        const collegeExists = res.colleges.some((c: any) => c.id === queryCollegeId)
+                        if (collegeExists) {
+                            setFormData(prev => ({ ...prev, collegeId: queryCollegeId }))
+                        }
+                    }
+                }
+            })
         })
-    }, [])
+    }, [queryCollegeId])
+
+    useEffect(() => {
+        if (formData.collegeId) {
+            setFetchingCourses(true)
+            getRegistrationCourses(formData.collegeId).then((res) => {
+                if (res.success && res.courses) {
+                    setCourses(res.courses as { id: string; name: string; code: string }[])
+                }
+                setFetchingCourses(false)
+            })
+        } else {
+            setCourses([])
+        }
+    }, [formData.collegeId])
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target
@@ -86,7 +115,7 @@ export function RegisterForm() {
             return formData.guardianName && formData.guardianRelationship && formData.guardianPhone
         }
         if (currentStep === 4) {
-            return formData.previousSchool && formData.graduationYear && formData.courseId
+            return formData.previousSchool && formData.graduationYear && formData.collegeId && formData.courseId
         }
         return true
     }
@@ -436,23 +465,46 @@ export function RegisterForm() {
                         </div>
 
                         <div className="col-span-2 mt-4">
-                            <h3 className="text-lg font-semibold mb-2">Program Selection</h3>
-                            <p className="text-sm text-muted-foreground mb-4">Choose the course you wish to apply for.</p>
+                            <h3 className="text-lg font-semibold mb-2">Institution & Program Selection</h3>
+                            <p className="text-sm text-muted-foreground mb-4">Choose the college and course you wish to apply for.</p>
                         </div>
-                        <div className="col-span-2 space-y-2">
-                            <Label htmlFor="courseId">Select Course *</Label>
-                            <Select name="courseId" value={formData.courseId} onValueChange={(val) => handleSelectChange("courseId", val)}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select a program..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {courses.map((course) => (
-                                        <SelectItem key={course.id} value={course.id}>
-                                            {course.code} - {course.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                        <div className="col-span-2 space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="collegeId">Select College *</Label>
+                                <Select name="collegeId" value={formData.collegeId} onValueChange={(val) => handleSelectChange("collegeId", val)}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select a college..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {colleges.map((college) => (
+                                            <SelectItem key={college.id} value={college.id}>
+                                                {college.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="courseId">Select Course *</Label>
+                                <Select
+                                    name="courseId"
+                                    value={formData.courseId}
+                                    onValueChange={(val) => handleSelectChange("courseId", val)}
+                                    disabled={!formData.collegeId || fetchingCourses}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder={!formData.collegeId ? "Select a college first" : fetchingCourses ? "Loading courses..." : "Select a program..."} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {courses.map((course) => (
+                                            <SelectItem key={course.id} value={course.id}>
+                                                {course.code} - {course.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
 
                         <div className="col-span-2 mt-4 p-4 bg-blue-50 text-blue-800 rounded-lg text-sm">

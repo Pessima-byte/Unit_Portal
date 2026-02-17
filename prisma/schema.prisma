@@ -75,9 +75,14 @@ model User {
   // Application
   application Application?
 
+  // College relation
+  college       College? @relation(fields: [collegeId], references: [id])
+  collegeId     String?
+
   @@index([email])
   @@index([role])
   @@index([studentId])
+  @@index([collegeId])
 }
 
 model Application {
@@ -146,7 +151,11 @@ model Department {
   courses     Course[]
   feeStructures FeeStructure[]
 
+  departmentColleges College? @relation(fields: [collegeId], references: [id])
+  collegeId         String?
+
   @@index([code])
+  @@index([collegeId])
 }
 
 enum CourseLevel {
@@ -349,11 +358,15 @@ model Announcement {
   createdBy   User     @relation("AnnouncementCreatedBy", fields: [createdById], references: [id])
   createdById String
 
+  college     College? @relation(fields: [collegeId], references: [id])
+  collegeId   String?
+
   notifications Notification[]
 
   @@index([type])
   @@index([targetRole])
   @@index([isPublished])
+  @@index([collegeId])
 }
 
 model Notification {
@@ -371,8 +384,27 @@ model Notification {
 
   announcement  Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
   @@index([status])
   @@index([read])
+}
+
+model College {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  logoUrl     String?
+  bannerUrl   String?
+  address     String?
+  contact     String?
+  email       String?
+  website     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users       User[]
+  departments Department[]
+  announcements Announcement[]
 }
 

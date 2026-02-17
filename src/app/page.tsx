@@ -9,6 +9,10 @@ import { db } from "@/lib/db"
 export default async function Home() {
   const session = await getServerSession(authOptions)
 
+  const colleges = (db as any).college ? await (db as any).college.findMany({
+    orderBy: { name: 'asc' },
+  }) : []
+
   if (session) {
     const role = session.user.role
 
@@ -77,6 +81,52 @@ export default async function Home() {
           </div>
         </section>
 
+
+        {/* Colleges Section */}
+        <section className="w-full py-12 md:py-24 bg-background">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
+              <div className="inline-block rounded-lg bg-blue-100 px-3 py-1 text-sm text-blue-600 font-medium">
+                Our Institutions
+              </div>
+              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Explore Our Colleges</h2>
+              <p className="max-w-[900px] text-gray-500 md:text-xl dark:text-gray-400">
+                Discover the diverse academic institutions that make up our university system.
+              </p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {colleges.length === 0 ? (
+                <div className="col-span-full text-center p-12 border border-dashed rounded-xl bg-muted/30">
+                  <p className="text-muted-foreground">No colleges listed at the moment.</p>
+                </div>
+              ) : (
+                colleges.map((college: any) => (
+                  <Link href={`/college/${college.slug}`} key={college.id}>
+                    <Card className="h-full hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer overflow-hidden border-muted group">
+                      <div className="h-3 w-full bg-gradient-to-r from-blue-500 to-cyan-400" />
+                      <CardHeader>
+                        <CardTitle className="text-xl group-hover:text-primary transition-colors">
+                          {college.name}
+                        </CardTitle>
+                        <CardDescription>{college.address}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-muted-foreground text-sm line-clamp-3">
+                          {college.description}
+                        </p>
+                        <Button variant="link" className="px-0 mt-4 text-primary font-medium group-hover:translate-x-1 transition-transform">
+                          Explore College &rarr;
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+
         {/* Announcements Section */}
         <section className="w-full py-12 md:py-24 bg-background">
           <div className="container px-4 md:px-6">
@@ -90,12 +140,17 @@ export default async function Home() {
               </p>
             </div>
 
-            {/* Fetch and display announcements */}
+            {/* Fetch and display announcements - Refreshing client context */}
             {await (async () => {
-              const announcements = await db.announcement.findMany({
+              const announcements = await (db.announcement as any).findMany({
                 where: {
                   isPublished: true,
                   targetRole: null, // Public announcements
+                },
+                include: {
+                  college: {
+                    select: { slug: true, name: true }
+                  }
                 },
                 orderBy: { createdAt: 'desc' },
                 take: 3,
@@ -111,33 +166,48 @@ export default async function Home() {
 
               return (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {announcements.map((item) => (
-                    <Card key={item.id} className="border-none shadow-md hover:shadow-xl transition-all duration-300 bg-card group overflow-hidden">
+                  {announcements.map((item: any) => (
+                    <Card key={item.id} className="border-none shadow-md hover:shadow-xl transition-all duration-300 bg-card group overflow-hidden flex flex-col">
                       <div className="h-2 w-full bg-gradient-to-r from-orange-400 to-red-500" />
                       <CardHeader>
                         <div className="flex justify-between items-start mb-2">
-                          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${item.type === 'URGENT' ? 'bg-red-100 text-red-600' :
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${item.type === 'URGENT' ? 'bg-red-100 text-red-600' :
                             item.type === 'ACADEMIC' ? 'bg-blue-100 text-blue-600' :
                               'bg-gray-100 text-gray-600'
                             }`}>
                             {item.type}
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[10px] text-muted-foreground font-medium">
                             {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </span>
                         </div>
                         <CardTitle className="text-xl group-hover:text-primary transition-colors line-clamp-2">
                           {item.title}
                         </CardTitle>
+                        {item.college && (
+                          <div className="text-[10px] font-bold text-primary/60 uppercase tracking-widest mt-1">
+                            {item.college.name}
+                          </div>
+                        )}
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="flex-1">
                         <p className="text-muted-foreground line-clamp-3 text-sm">
                           {item.content}
                         </p>
-                        <Button variant="link" className="px-0 mt-4 text-primary font-medium group-hover:translate-x-1 transition-transform">
-                          Read more &rarr;
-                        </Button>
                       </CardContent>
+                      <div className="p-6 pt-0">
+                        {item.college ? (
+                          <Link href={`/college/${item.college.slug}`}>
+                            <Button variant="link" className="px-0 text-primary font-medium group-hover:translate-x-1 transition-transform">
+                              Read more &rarr;
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Button variant="link" className="px-0 text-primary font-medium group-hover:translate-x-1 transition-transform cursor-default opacity-70">
+                            Global Update
+                          </Button>
+                        )}
+                      </div>
                     </Card>
                   ))}
                 </div>

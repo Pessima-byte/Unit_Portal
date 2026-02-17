@@ -12,50 +12,59 @@ async function main() {
         return
     }
 
+    const fbc = await prisma.college.findUnique({ where: { slug: 'fbc' } })
+    const ipam = await prisma.college.findUnique({ where: { slug: 'ipam' } })
+    const comahs = await prisma.college.findUnique({ where: { slug: 'comahs' } })
+
     const announcements = [
         {
-            title: "Fall Semester Registration Open",
-            content: "Registration for the upcoming Fall Semester is now open. All students are advised to complete their course selection by the end of the month. Visit the student portal for more details.",
-            type: "ACADEMIC",
-            isPublished: true,
-            publishedAt: new Date(),
-            createdById: admin.id
-        },
-        {
-            title: "Campus Maintenance Scheduled",
-            content: "Please be aware that routine maintenance is scheduled for the main library building this weekend. Access may be limited during this time.",
-            type: "URGENT",
-            isPublished: true,
-            publishedAt: new Date(),
-            createdById: admin.id
-        },
-        {
-            title: "University Ranking Improvement",
-            content: "We are proud to announce that our university has moved up 10 places in the global rankings. This is a testament to the hard work of our faculty and students.",
+            title: "College C Annual Founder's Day",
+            content: "Join us this Friday at College C for the celebration of our historic legacy. Refreshments will be provided.",
             type: "GENERAL",
             isPublished: true,
             publishedAt: new Date(),
-            createdById: admin.id
+            createdById: admin.id,
+            collegeId: fbc?.id
+        },
+        {
+            title: "College B Business Seminar",
+            content: "A guest lecture from the Central Bank Governor will take place in the College B main auditorium. Mandatory for Final Year students.",
+            type: "ACADEMIC",
+            isPublished: true,
+            publishedAt: new Date(),
+            createdById: admin.id,
+            collegeId: ipam?.id
+        },
+        {
+            title: "College A Lab Maintenance",
+            content: "College A Surgery lab 2 will be closed for sterilization and equipment upgrade. Please use Lab 3 for practicals.",
+            type: "URGENT",
+            isPublished: true,
+            publishedAt: new Date(),
+            createdById: admin.id,
+            collegeId: comahs?.id
+        },
+        {
+            title: "Joint Convocation Ceremony",
+            content: "All colleges are informed that the joint convocation ceremony is scheduled for the end of the semester.",
+            type: "GENERAL",
+            isPublished: true,
+            publishedAt: new Date(),
+            createdById: admin.id,
+            collegeId: null // Global
         }
     ]
 
     for (const ann of announcements) {
-        // Check if exists to avoid duplicates if run multiple times (optional but good practice)
-        const existing = await prisma.announcement.findFirst({
-            where: { title: ann.title }
+        await prisma.announcement.upsert({
+            where: { id: (await prisma.announcement.findFirst({ where: { content: ann.content } }))?.id || 'new' },
+            create: ann,
+            update: ann,
         })
-
-        if (!existing) {
-            await prisma.announcement.create({
-                data: ann
-            })
-            console.log(`Created announcement: ${ann.title}`)
-        } else {
-            console.log(`Skipped existing: ${ann.title}`)
-        }
+        console.log(`Processed announcement: ${ann.title}`)
     }
 
-    console.log('Announcements seeded successfully.')
+    console.log('College-specific announcements seeded successfully.')
 }
 
 main()

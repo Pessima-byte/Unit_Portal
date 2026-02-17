@@ -15,12 +15,33 @@ interface RegisterData {
   courseId?: string
 }
 
-export async function getRegistrationCourses() {
+export async function getColleges() {
   try {
+    const colleges = await db.college.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, slug: true },
+    })
+    return { success: true, colleges }
+  } catch (error) {
+    console.error("Error fetching colleges:", error)
+    return { success: false, error: "Failed to fetch colleges" }
+  }
+}
+
+export async function getRegistrationCourses(collegeId?: string) {
+  try {
+    const where: any = { isActive: true }
+
+    if (collegeId) {
+      where.department = {
+        collegeId: collegeId
+      }
+    }
+
     const courses = await db.course.findMany({
-      where: { isActive: true },
+      where,
       select: { id: true, name: true, code: true },
-      take: 100 // Limit for now
+      take: 100
     })
     return { success: true, courses }
   } catch (error) {
@@ -59,6 +80,7 @@ export interface StudentApplicationData {
 
   // Program
   courseId: string
+  collegeId: string
 
   // Documents (Optional for now, or URLs handled separately)
   passportPhotoUrl?: string
@@ -92,6 +114,7 @@ export async function submitStudentApplication(data: StudentApplicationData) {
           phone: data.phone,
           address: data.address,
           dateOfBirth: data.dateOfBirth,
+          collegeId: data.collegeId,
           isActive: false, // Inactive until approved
         }
       })
